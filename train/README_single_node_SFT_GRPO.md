@@ -5,7 +5,7 @@
 
 これでジョブを切る
 ```sh
-bash ../shareP12/scancel_hatakeyama.sh gpu84
+bash ../shareP12/scancel_hatakeyama.sh gpu85
 ```
 
 
@@ -63,27 +63,8 @@ huggingface-cli login
 wandb login
 ```
 
-### Step 1-2. gsm8kデータとLlamaモデルのウンロード
-``` sh
-#gsm8kを例にして、SFTおよびPPOのトレーニングを行います。
-cd ~/deps/verl
+### Step 1-2. gsm8kデータとLlamaモデルのウンロード（ここも省略する
 
-mkdir -p ~/data/gsm8k
-
-python examples/data_preprocess/gsm8k.py --local_dir ~/data/gsm8k
-
-#Llama-3.2-1B-Instructを例にして、SFTおよびPPOのトレーニングを行います。
-mkdir -p ~/model
-
-cd ~/model
-#llama の使用許可を取得するために、huggingface にログインする必要があります。
-# Usernameはhuggingfaceと同じです。パスワードの入力を求められた場合は、書き込み権限付きのアクセストークンを使用してください。
-# アクセストークンは以下のページから発行できます: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-git lfs install
-git clone https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
-
-cd ../
-```
 ### Step1-3(SFT)はここでは省略
 
 ### Step 1-4. 強化学習（GRPO）の実行
@@ -123,30 +104,28 @@ export WANDB_RUN_NAME="Qwen3_32b_SFT_GRPO_001"
 #  trainer.nnodes=1　は、何node使用するか？(適宜変更)
 
 #変更を加えた点
-#  actor_rollout_ref.rollout.gpu_memory_utilization=0.8 メモリ使用率を上げる
-# data.train_batch_size=128 バッチサイズを下げる
-#  data.max_prompt_length=1024
-#  data.max_response_length=2048
+# +actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 \を加えないと1 node 8GPUでもOOMしてしまうので注意
 
 PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  data.train_files=$HOME/data/gsm8k/train.parquet \
  data.val_files=$HOME/data/gsm8k/test.parquet \
  data.train_batch_size=128 \
- data.max_prompt_length=1024 \
- data.max_response_length=2048 \
+ data.max_prompt_length=512 \
+ data.max_response_length=1024 \
  data.dataloader_num_workers=0 \
- actor_rollout_ref.model.path=/home/Competition2025/P12/shareP12/temp/Qwen3_SFT_MATH \
+ actor_rollout_ref.model.path=/home/Competition2025/P12/shareP12/models/Qwen3-32B \
  actor_rollout_ref.actor.optim.lr=5e-7 \
  actor_rollout_ref.actor.ppo_mini_batch_size=64 \
  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
  actor_rollout_ref.actor.use_kl_loss=True \
  actor_rollout_ref.actor.kl_loss_coef=0.001 \
  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 \
- actor_rollout_ref.rollout.tensor_model_parallel_size=8 \
+ actor_rollout_ref.rollout.tensor_model_parallel_size=4 \
  actor_rollout_ref.rollout.gpu_memory_utilization=0.8 \
  actor_rollout_ref.rollout.n=4 \
  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
  actor_rollout_ref.rollout.name=vllm \
++actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 \
  algorithm.adv_estimator=grpo \
  algorithm.kl_ctrl.kl_coef=0.001 \
  trainer.logger=['console'] \
@@ -155,11 +134,12 @@ PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  trainer.nnodes=1 \
  trainer.save_freq=10 \
  trainer.test_freq=10 \
- trainer.default_local_dir=$HOME/training/grpo/checkpoints \
+ trainer.default_local_dir=$HOME/training/grpo_001/checkpoints \
  trainer.logger=['console','wandb'] \
  trainer.project_name=$WANDB_PROJECT_NAME \
  trainer.experiment_name=$WANDB_RUN_NAME \
- trainer.total_epochs=15 2>&1 | tee verl_grpo.log
+ trainer.total_epochs=15 2>&1 | tee verl_grpo.log 
+
 
 
 ```
