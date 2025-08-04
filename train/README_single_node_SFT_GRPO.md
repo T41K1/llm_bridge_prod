@@ -10,7 +10,7 @@ bash ../shareP12/scancel_hatakeyama.sh gpu85
 
 
 ```sh
- srun --partition P12 --nodes=1 --nodelist osk-gpu[85] --gpus-per-node=8  --cpus-per-task=240 --time=08:00:00 --pty bash -i
+ srun --partition P12 --nodes=1 --nodelist osk-gpu[86] --gpus-per-node=8  --cpus-per-task=240 --time=30:00:00 --pty bash -i
 ```
 
 

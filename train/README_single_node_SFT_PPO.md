@@ -57,73 +57,6 @@ huggingface-cli login
 wandb login
 ```
 
-### Step 1-2. gsm8kデータとLlamaモデルのウンロード
-``` sh
-#gsm8kを例にして、SFTおよびPPOのトレーニングを行います。
-cd ~/deps/verl
-
-mkdir -p ~/data/gsm8k
-
-python examples/data_preprocess/gsm8k.py --local_dir ~/data/gsm8k
-
-#Llama-3.2-1B-Instructを例にして、SFTおよびPPOのトレーニングを行います。
-mkdir -p ~/model
-
-cd ~/model
-#llama の使用許可を取得するために、huggingface にログインする必要があります。
-# Usernameはhuggingfaceと同じです。パスワードの入力を求められた場合は、書き込み権限付きのアクセストークンを使用してください。
-# アクセストークンは以下のページから発行できます: [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
-git lfs install
-git clone https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct
-
-cd ../
-```
-
-### Step 1-3. ファインチューニングの実行
-``` sh
-mkdir -p ~/training/sft
-
-mkdir -p ~/training/sft/checkpoints
-
-cd ~/training/sft
-#基本的なネットワーク設定
-export NCCL_SOCKET_IFNAME=enp25s0np0
-export NVTE_FUSED_ATTN=0
-#CUDA_VISIBLE_DEVICESでトレーニングに使用するGPUの数を制御します。
-#例えば、単一GPUの場合は以下のように設定します：
-#export CUDA_VISIBLE_DEVICES=0
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
-ulimit -v unlimited
-
-#YOU_TEAM を wandb の組織名に置き換えてください。
-export WANDB_ENTITY="YOU_TEAM"
-export WANDB_PROJECT_NAME="competition_verl_test"
-export WANDB_RUN_NAME="llama3.2_SFT_test"
-
-torchrun --standalone --nnodes=1 --nproc_per_node=8 \
-    -m verl.trainer.fsdp_sft_trainer \
-    data.train_files=$HOME/data/gsm8k/train.parquet \
-    data.val_files=$HOME/data/gsm8k/test.parquet \
-    data.prompt_key=extra_info \
-    data.response_key=extra_info \
-    data.prompt_dict_keys=['question'] \
-    +data.response_dict_keys=['answer'] \
-    data.micro_batch_size_per_gpu=8 \
-    model.partial_pretrain=$HOME/model/Llama-3.2-1B-Instruct \
-    trainer.project_name=gsm8k-sft \
-    trainer.experiment_name=$HOME/model/Llama-3.2-1B-Instruct \
-    trainer.total_epochs=2 \
-    trainer.default_local_dir=$HOME/training/sft/checkpoints \
-    trainer.logger=['console','wandb'] \
-    trainer.project_name=$WANDB_PROJECT_NAME \
-    trainer.experiment_name=$WANDB_RUN_NAME
-```
-学習済みモデルのパスは以下の通りです。
-```sh
-cd $HOME/training/sft/checkpoints/global_step_58
-ls -lh
-```
-
 ### Step 1-4. 強化学習PPOの実行
 
 rollout の設定に以下を追加してください：
@@ -152,9 +85,9 @@ unset ROCR_VISIBLE_DEVICES
 ulimit -v unlimited
 
 #YOU_TEAM_ENTITY_NAME を wandb の組織名に置き換えてください。
-export WANDB_ENTITY="YOU_TEAM_ENTITY_NAME"
-export WANDB_PROJECT_NAME="competition_verl_test"
-export WANDB_RUN_NAME="llama3.2_PPO_test"
+# export WANDB_ENTITY="YOU_TEAM_ENTITY_NAME"
+export WANDB_PROJECT_NAME="competition_verl_test_ppo"
+export WANDB_RUN_NAME="Qwen3-32b_sft_PPO_test"
 
 PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  data.train_files=$HOME/data/gsm8k/train.parquet \
@@ -163,16 +96,21 @@ PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  data.max_prompt_length=512 \
  data.max_response_length=256 \
  data.dataloader_num_workers=0 \
- actor_rollout_ref.model.path=$HOME/model/Llama-3.2-1B-Instruct \
- actor_rollout_ref.actor.optim.lr=1e-6 \
+ actor_rollout_ref.model.path=$HOME/model/Qwen3_SFT_MATH/checkpoints/global_step_116/huggingface \
+ actor_rollout_ref.actor.optim.lr=3e-6 \
  actor_rollout_ref.actor.ppo_mini_batch_size=64 \
  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=8 \
- actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
- actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+ actor_rollout_ref.rollout.tensor_model_parallel_size=8 \
+ actor_rollout_ref.rollout.gpu_memory_utilization=0.80 \
  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
+ actor_rollout_ref.rollout.name=vllm \
+ +actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 \
+ +actor_rollout_ref.ref.fsdp_config.model_dtype=bf16 \
+ +actor_rollout_ref.rollout.vllm_dtype=bf16 \
+ +critic.fsdp_config.model_dtype=bf16 \
  critic.optim.lr=1e-5 \
- critic.model.path=$HOME/model/Llama-3.2-1B-Instruct \
+ critic.model.path=$HOME/model/Qwen3_SFT_MATH/checkpoints/global_step_116/huggingface \
  critic.ppo_micro_batch_size_per_gpu=4 \
  algorithm.kl_ctrl.kl_coef=0.001 \
  trainer.logger=['console'] \
