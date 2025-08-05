@@ -2,13 +2,12 @@
 #SBATCH --job-name=grpo_full_pipeline
 #SBATCH --partition=P12
 #SBATCH --nodes=1
+#SBATCH --gres=gpu:8 # GPUが必要な場合
 #SBATCH --nodelist=osk-gpu[85]
-#SBATCH --gpus-per-node=8
 #SBATCH --cpus-per-task=240
 #SBATCH --time=50:00:00
-#SBATCH --output=%j.out
-#SBATCH --error=%j.err
 
+nvidia-smi
 # エラー時に停止
 set -e
 
