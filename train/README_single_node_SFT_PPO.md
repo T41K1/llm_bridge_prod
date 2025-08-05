@@ -83,6 +83,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 #※AMD製のGPUではないため、ROCR_VISIBLE_DEVICES を指定しないようにしてください。指定するとエラーになります。
 unset ROCR_VISIBLE_DEVICES
 ulimit -v unlimited
+[参照page](https://verl.readthedocs.io/en/latest/advance/ppo_lora.html) ここにqwen2.5をrlしている
 
 #YOU_TEAM_ENTITY_NAME を wandb の組織名に置き換えてください。
 # export WANDB_ENTITY="YOU_TEAM_ENTITY_NAME"
@@ -107,8 +108,8 @@ PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  actor_rollout_ref.rollout.name=vllm \
  +actor_rollout_ref.actor.fsdp_config.model_dtype=bf16 \
  +actor_rollout_ref.ref.fsdp_config.model_dtype=bf16 \
- +actor_rollout_ref.rollout.vllm_dtype=bf16 \
- +critic.fsdp_config.model_dtype=bf16 \
+ +actor_rollout_ref.rollout.quantization=int8 \
+ +critic.quantization=int8 \
  critic.optim.lr=1e-5 \
  critic.model.path=$HOME/model/Qwen3_SFT_MATH/checkpoints/global_step_116/huggingface \
  critic.ppo_micro_batch_size_per_gpu=4 \

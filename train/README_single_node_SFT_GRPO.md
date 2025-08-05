@@ -78,7 +78,7 @@ actor_rollout_ref.rollout.tensor_model_parallel_size=<GPU 数>
 例えば、GPU が 1 枚で推論の場合は `1` と指定します。
 
 ``` sh
-mkdir -p ~/training/grpo
+mkdir -p ~/training/grpo_00
 
 mkdir -p ~/training/grpo/checkpoints
 
@@ -109,11 +109,11 @@ export WANDB_RUN_NAME="Qwen3_32b_SFT_GRPO_001"
 PYTHONUNBUFFERED=1 python -m verl.trainer.main_ppo \
  data.train_files=$HOME/data/gsm8k/train.parquet \
  data.val_files=$HOME/data/gsm8k/test.parquet \
- data.train_batch_size=128 \
- data.max_prompt_length=512 \
- data.max_response_length=1024 \
+ data.train_batch_size=256 \
+ data.max_prompt_length=2048 \
+ data.max_response_length=14336 \
  data.dataloader_num_workers=0 \
- actor_rollout_ref.model.path=/home/Competition2025/P12/shareP12/models/Qwen3-32B \
+ actor_rollout_ref.model.path=$HOME/model/Qwen3_SFT_MATH/checkpoints/global_step_116/huggingface \
  actor_rollout_ref.actor.optim.lr=5e-7 \
  actor_rollout_ref.actor.ppo_mini_batch_size=64 \
  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
